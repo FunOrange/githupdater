@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace githupdater
@@ -138,7 +139,7 @@ namespace githupdater
 
             // Kill main application process
             Console.WriteLine($"Waiting for {exe} to close...");
-            foreach (var process in Process.GetProcessesByName(exe))
+            foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(exe)))
                 process.Kill();
 
             // Download zip file
@@ -176,7 +177,23 @@ namespace githupdater
                 foreach (var file in Directory.GetFiles(folders.Source, "*.*"))
                 {
                     string targetFile = Path.Combine(folders.Target, Path.GetFileName(file));
-                    if (File.Exists(targetFile)) File.Delete(targetFile);
+                    if (File.Exists(targetFile))
+                    {
+                        while (true)
+                        {
+                            try
+                            {
+                                File.Delete(targetFile);
+                                break;
+                            }
+                            catch
+                            {
+                                Console.WriteLine($"Failed to delete {targetFile}. Retrying after 3 seconds...");
+                                Thread.Sleep(3000);
+                                continue;
+                            }
+                        }
+                    }
                     File.Move(file, targetFile);
                 }
 
