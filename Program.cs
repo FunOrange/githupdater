@@ -147,7 +147,6 @@ namespace githupdater
             DeleteUpdaterFromZipFile(archiveFile);
             // extract zip file into same directory as this .exe
             Console.WriteLine($"Extracting zip...");
-
             ExtractUpdates(archiveFile);
 
             Console.WriteLine($"Starting {exe}...");
@@ -162,6 +161,7 @@ namespace githupdater
             string updateFilesDir = Directory.GetDirectories("update_files")[0];
             MoveDirectory(updateFilesDir, ".");
             Directory.Delete("update_files", true);
+            File.Delete(archiveFile);
         }
         #region Move Directory
         public static void MoveDirectory(string source, string target)
@@ -238,12 +238,12 @@ namespace githupdater
         }
         private static void DeleteUpdaterFromZipFile(string archiveFile)
         {
-            // Limitation: can't update updater files themselves
+            // Limitation: updater cannot update itself
             var updaterFiles = new string[]
             {
-                "githupdater.exe",
-                "githupdater.pdb",
-                "githupdater.exe.config",
+                "updater.exe",
+                "updater.pdb",
+                "updater.exe.config",
                 "Newtonsoft.Json.dll",
                 "Newtonsoft.Json.xml",
             };
