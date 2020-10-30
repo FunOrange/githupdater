@@ -105,14 +105,20 @@ namespace githupdater
 
     // To build single exe:
     // 1. Tools > Command line > Developer Command Prompt
-    // 2. msbuild /t:Restore
-    // 3. msbuild /t:ILMerge
+    // 2. msbuild /t:Restore && msbuild /t:ILMerge
 
     class Program
     {
         static void Main(string[] args)
         {
-            string repo = "", exe = "", currentVersion = "";
+            if (!File.Exists("version.txt"))
+            {
+                Console.WriteLine("Checking for updates...");
+                Console.WriteLine("version.txt missing. Try redownloading this program.");
+                Thread.Sleep(2000);
+                Environment.Exit(-1);
+            }
+            string repo = null, exe = null, currentVersion = null;
             foreach (string line in File.ReadAllLines("version.txt"))
             {
                 string attribute = line.Split(':')[0];
@@ -130,17 +136,23 @@ namespace githupdater
                         break;
                     case "check for updates":
                         if (value.Trim().ToLower() == "false" || value.Trim().ToLower() == "no")
-                            return; // quit
+                            Environment.Exit(-1); // quit
                         break;
                 }
+            }
+            if (repo == null || exe == null || currentVersion == null)
+            {
+                Console.WriteLine("version.txt is corrupt. Try redownloading this program.");
+                Thread.Sleep(2000);
+                Environment.Exit(-1);
             }
             Console.WriteLine($"Checking updates for {repo}");
 
             // Make API request to github
             var latestRelease = GetLatestReleaseFromGithub(repo);
             if (latestRelease.tag_name == currentVersion)
-                return; // no new release; quit
-            Console.WriteLine($"New release found! (new: {latestRelease.tag_name} current: {currentVersion})");
+                Environment.Exit(0); // no new release; quit
+            Console.WriteLine($"\nNew release found! (new: {latestRelease.tag_name} current: {currentVersion})\n");
 
             // Kill main application process
             Console.WriteLine($"Waiting for {exe} to close...");
@@ -156,6 +168,12 @@ namespace githupdater
             ExtractUpdates(archiveFile);
 
             Console.WriteLine($"Starting {exe}...");
+            if (!File.Exists(exe))
+            {
+                Console.WriteLine($"Could not find {exe}!");
+                Thread.Sleep(2000);
+                Environment.Exit(-1);
+            }
             Process.Start(exe);
         }
 
@@ -193,7 +211,7 @@ namespace githupdater
                             }
                             catch
                             {
-                                Console.WriteLine($"Failed to delete {targetFile}. Retrying after 3 seconds...");
+                                Console.WriteLine($"Failed to delete {targetFile} (in use? antivirus?). Retrying after 3 seconds...");
                                 Thread.Sleep(3000);
                                 continue;
                             }
@@ -242,10 +260,18 @@ namespace githupdater
                     string responseJson = readTask.Result;
                     return latestRelease = JsonConvert.DeserializeObject<Release>(responseJson);
                 }
+                else
+                {
+                    Console.WriteLine($"Github request failed. {repo} may not be a valid repository.");
+                    Thread.Sleep(3000);
+                    Environment.Exit(-1);
+                }
             }
             catch (Exception e)
             {
                 Console.WriteLine($"Update check failed. Check for updates here: https://github.com/{repo}/releases/latest", "Error");
+                Thread.Sleep(3000);
+                Environment.Exit(-1);
             }
             return null;
         }
@@ -255,7 +281,18 @@ namespace githupdater
             string downloadLink = latestRelease.assets[0].browser_download_url;
             var client = new WebClient();
             Console.WriteLine($"Downloading file: {downloadLink}...");
-            client.DownloadFile(downloadLink, "update.zip");
+            try
+            {
+                client.DownloadFile(downloadLink, "update.zip");
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine(e);
+                Console.WriteLine("");
+                if (e.InnerException is UnauthorizedAccessException)
+                    Console.WriteLine("Permission Denied.");
+                Console.WriteLine("Unable to download file. Try checking your antivirus.");
+            }
             return "update.zip";
         }
         private static void DeleteUpdaterFromZipFile(string archiveFile)
