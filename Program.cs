@@ -123,8 +123,8 @@ namespace githupdater
                     case "current version":
                         currentVersion = value.Trim();
                         break;
-                    case "do not check for updates":
-                        if (value.Trim().ToLower() == "true" || value.Trim().ToLower() == "yes")
+                    case "check for updates":
+                        if (value.Trim().ToLower() == "false" || value.Trim().ToLower() == "no")
                             return; // quit
                         break;
                 }
