@@ -103,6 +103,11 @@ namespace githupdater
     }
     #endregion
 
+    // To build single exe:
+    // 1. Tools > Command line > Developer Command Prompt
+    // 2. msbuild /t:Restore
+    // 3. msbuild /t:ILMerge
+
     class Program
     {
         static void Main(string[] args)
@@ -258,11 +263,7 @@ namespace githupdater
             // Limitation: updater cannot update itself
             var updaterFiles = new string[]
             {
-                "updater.exe",
-                "updater.pdb",
-                "updater.exe.config",
-                "Newtonsoft.Json.dll",
-                "Newtonsoft.Json.xml",
+                "updater.exe"
             };
             using (FileStream fs = new FileStream(archiveFile, FileMode.Open))
             using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Update))
