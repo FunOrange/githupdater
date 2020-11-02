@@ -152,11 +152,6 @@ namespace githupdater
                 Environment.Exit(0); // no new release; quit
             Console.WriteLine($"\nNew release found! (new: {latestRelease.tag_name} current: {currentVersion})\n");
 
-            // Kill main application process
-            Console.WriteLine($"Waiting for {exe} to close...");
-            foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(exe)))
-                process.Kill();
-
             // Download zip file
             string zipFile = DownloadLatestReleaseFiles(latestRelease);
             if (Path.GetExtension(zipFile) != ".zip")
@@ -164,10 +159,12 @@ namespace githupdater
                 Console.WriteLine($"Error: {zipFile} is not a zip file.");
                 UpdaterBadExit();
             }
+
             Console.WriteLine($"Deleting updater inside zip before extracting...");
             DeleteUpdaterFromZipFile(zipFile);
+
             Console.WriteLine($"Extracting zip...");
-            ExtractUpdates(zipFile);
+            ExtractUpdates(zipFile, exe);
 
             Console.WriteLine($"Starting {exe}...");
             if (!File.Exists(exe))
@@ -178,7 +175,7 @@ namespace githupdater
             Process.Start(exe);
         }
 
-        private static void ExtractUpdates(string archiveFile)
+        private static void ExtractUpdates(string archiveFile, string exe)
         {
             if (Directory.Exists("update_files"))
                 Directory.Delete("update_files", true);
@@ -192,6 +189,12 @@ namespace githupdater
                 Console.WriteLine($"Failed to extract zip to directory 'update_files'");
                 UpdaterBadExit();
             }
+            // Kill main application process before overwriting files
+            Console.WriteLine($"Waiting for {exe} to close...");
+            foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(exe)))
+                process.Kill();
+            Thread.Sleep(1000); // make sure it's closed before proceeding
+
             string updateFilesDir = Directory.GetDirectories("update_files")[0];
             try
             {
@@ -230,13 +233,14 @@ namespace githupdater
                             }
                             catch
                             {
-                                Console.WriteLine($"Failed to delete {targetFile} (in use? antivirus?). Retrying after 3 seconds...");
+                                Console.WriteLine($"Unable to delete {targetFile} (in use? antivirus?). Retrying after 3 seconds...");
                                 Thread.Sleep(3000);
                                 continue;
                             }
                         }
                     }
                     File.Move(file, targetFile);
+                    Console.WriteLine(targetFile);
                 }
 
                 foreach (var folder in Directory.GetDirectories(folders.Source))
@@ -332,7 +336,6 @@ namespace githupdater
                         complete = true;
                         foreach (var item in archive.Entries)
                         {
-                            Console.WriteLine(item);
                             if (updaterFiles.Contains(item.Name))
                             {
                                 item.Delete();
