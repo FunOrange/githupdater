@@ -115,8 +115,7 @@ namespace githupdater
             {
                 Console.WriteLine("Checking for updates...");
                 Console.WriteLine("version.txt missing. Try redownloading this program.");
-                Thread.Sleep(2000);
-                Environment.Exit(-1);
+                UpdaterBadExit();
             }
             string repo = null, exe = null, currentVersion = null;
             foreach (string line in File.ReadAllLines("version.txt"))
@@ -136,15 +135,14 @@ namespace githupdater
                         break;
                     case "check for updates":
                         if (value.Trim().ToLower() == "false" || value.Trim().ToLower() == "no")
-                            Environment.Exit(-1); // quit
+                            UpdaterBadExit();
                         break;
                 }
             }
             if (repo == null || exe == null || currentVersion == null)
             {
                 Console.WriteLine("version.txt is corrupt. Try redownloading this program.");
-                Thread.Sleep(2000);
-                Environment.Exit(-1);
+                UpdaterBadExit();
             }
             Console.WriteLine($"Checking updates for {repo}");
 
@@ -160,19 +158,22 @@ namespace githupdater
                 process.Kill();
 
             // Download zip file
-            string archiveFile = DownloadLatestReleaseFiles(latestRelease);
-            // Delete updater.exe from zip file
-            DeleteUpdaterFromZipFile(archiveFile);
-            // extract zip file into same directory as this .exe
+            string zipFile = DownloadLatestReleaseFiles(latestRelease);
+            if (Path.GetExtension(zipFile) != ".zip")
+            {
+                Console.WriteLine($"Error: {zipFile} is not a zip file.");
+                UpdaterBadExit();
+            }
+            Console.WriteLine($"Deleting updater inside zip before extracting...");
+            DeleteUpdaterFromZipFile(zipFile);
             Console.WriteLine($"Extracting zip...");
-            ExtractUpdates(archiveFile);
+            ExtractUpdates(zipFile);
 
             Console.WriteLine($"Starting {exe}...");
             if (!File.Exists(exe))
             {
                 Console.WriteLine($"Could not find {exe}!");
-                Thread.Sleep(2000);
-                Environment.Exit(-1);
+                UpdaterBadExit();
             }
             Process.Start(exe);
         }
@@ -181,10 +182,28 @@ namespace githupdater
         {
             if (Directory.Exists("update_files"))
                 Directory.Delete("update_files", true);
-            ZipFile.ExtractToDirectory(archiveFile, "update_files");
+            try
+            {
+                ZipFile.ExtractToDirectory(archiveFile, "update_files");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                Console.WriteLine($"Failed to extract zip to directory 'update_files'");
+                UpdaterBadExit();
+            }
             string updateFilesDir = Directory.GetDirectories("update_files")[0];
-            MoveDirectory(updateFilesDir, ".");
-            Directory.Delete("update_files", true);
+            try
+            {
+                MoveDirectory(updateFilesDir, ".");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                Console.WriteLine($"Error occurred while moving update files to application directory.");
+                UpdaterBadExit();
+            }
+            try { Directory.Delete("update_files", true); } catch {} // do nothing
             File.Delete(archiveFile);
         }
         #region Move Directory
@@ -263,15 +282,14 @@ namespace githupdater
                 else
                 {
                     Console.WriteLine($"Github request failed. {repo} may not be a valid repository.");
-                    Thread.Sleep(3000);
-                    Environment.Exit(-1);
+                    UpdaterBadExit();
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Update check failed. Check for updates here: https://github.com/{repo}/releases/latest", "Error");
-                Thread.Sleep(3000);
-                Environment.Exit(-1);
+                Console.WriteLine(e);
+                Console.WriteLine($"\nUpdate check failed. Check for updates here: https://github.com/{repo}/releases/latest", "Error");
+                UpdaterBadExit();
             }
             return null;
         }
@@ -279,11 +297,12 @@ namespace githupdater
         private static string DownloadLatestReleaseFiles(Release latestRelease)
         {
             string downloadLink = latestRelease.assets[0].browser_download_url;
+            string fileName = Path.GetFileName(new Uri(downloadLink).LocalPath);
             var client = new WebClient();
             Console.WriteLine($"Downloading file: {downloadLink}...");
             try
             {
-                client.DownloadFile(downloadLink, "update.zip");
+                client.DownloadFile(downloadLink, fileName);
             }
             catch (WebException e)
             {
@@ -293,34 +312,50 @@ namespace githupdater
                     Console.WriteLine("Permission Denied.");
                 Console.WriteLine("Unable to download file. Try checking your antivirus.");
             }
-            return "update.zip";
+            return fileName;
         }
         private static void DeleteUpdaterFromZipFile(string archiveFile)
         {
             // Limitation: updater cannot update itself
             var updaterFiles = new string[]
             {
-                "updater.exe"
+                Path.GetFileName(Process.GetCurrentProcess().MainModule.FileName) // this exe
             };
-            using (FileStream fs = new FileStream(archiveFile, FileMode.Open))
-            using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Update))
+            try
             {
-                bool complete = false;
-                while (!complete)
+                using (FileStream fs = new FileStream(archiveFile, FileMode.Open))
+                using (ZipArchive archive = new ZipArchive(fs, ZipArchiveMode.Update))
                 {
-                    complete = true;
-                    foreach (var item in archive.Entries)
+                    bool complete = false;
+                    while (!complete)
                     {
-                        Console.WriteLine(item);
-                        if (updaterFiles.Contains(item.Name))
+                        complete = true;
+                        foreach (var item in archive.Entries)
                         {
-                            item.Delete();
-                            complete = false;
-                            break;
+                            Console.WriteLine(item);
+                            if (updaterFiles.Contains(item.Name))
+                            {
+                                item.Delete();
+                                complete = false;
+                                break;
+                            }
                         }
                     }
                 }
             }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                Console.WriteLine($"\n{archiveFile} may be corrupt.");
+                throw;
+            }
+        }
+
+        private static void UpdaterBadExit()
+        {
+            Console.WriteLine("Press any key to exit...");
+            Console.ReadKey();
+            Environment.Exit(-1);
         }
     }
 }
