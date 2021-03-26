@@ -65,9 +65,6 @@
     </PropertyGroup>
     <Error Condition="!Exists('packages\ILMerge.3.0.41\build\ILMerge.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\ILMerge.3.0.41\build\ILMerge.props'))" />
   </Target>
-  <ItemGroup>
-    <PackageReference Include="ILMerge" Version="3.0.29" />
-  </ItemGroup>
   <Target Name="ILMerge">
     <!-- the ILMergePath property points to the location of ILMerge.exe console application -->
     <Exec Command="$(ILMergeConsolePath) bin\Release\updater.exe ^&#xD;&#xA;        /out:updater.exe ^&#xD;&#xA;        bin\Release\Newtonsoft.Json.dll " />
