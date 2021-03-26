@@ -145,7 +145,7 @@ namespace githupdater
                         break;
                     case "check for updates":
                         if (value.Trim().ToLower() == "false" || value.Trim().ToLower() == "no")
-                            UpdaterBadExit();
+                           Environment.Exit(0);
                         break;
                 }
             }
