@@ -107,10 +107,20 @@ namespace githupdater
     // 1. Tools > Command line > Developer Command Prompt
     // 2. msbuild /t:Restore && msbuild /t:ILMerge
 
+    // Single line command:
+    // dotnet build --configuration Release && msbuild /t:Restore && msbuild /t:ILMerge && mv updater.exe C:\Users\funor\Windows7\osu-trainer-v1.5.1\updater.exe
+
     class Program
     {
         static void Main(string[] args)
         {
+            // Need this here to work for Windows 7
+            ServicePointManager.Expect100Continue = true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls
+                   | SecurityProtocolType.Tls11
+                   | SecurityProtocolType.Tls12
+                   | SecurityProtocolType.Ssl3;
+
             if (!File.Exists("version.txt"))
             {
                 Console.WriteLine("Checking for updates...");
@@ -149,7 +159,11 @@ namespace githupdater
             // Make API request to github
             var latestRelease = GetLatestReleaseFromGithub(repo);
             if (latestRelease.tag_name == currentVersion)
-                Environment.Exit(0); // no new release; quit
+            {
+                Console.WriteLine("Already up to date!");
+                Thread.Sleep(100);
+                Environment.Exit(0);
+            }
             Console.WriteLine($"\nNew release found! (new: {latestRelease.tag_name} current: {currentVersion})\n");
 
             // Download zip file
@@ -281,7 +295,7 @@ namespace githupdater
                     var readTask = response.Content.ReadAsStringAsync();
                     readTask.Wait();
                     string responseJson = readTask.Result;
-                    return latestRelease = JsonConvert.DeserializeObject<Release>(responseJson);
+                    return JsonConvert.DeserializeObject<Release>(responseJson);
                 }
                 else
                 {
